@@ -1,9 +1,11 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
+// console.log("Loaded PRIVATE_KEY:", process.env.PRIVATE_KEY);
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.20",
+  solidity: "0.8.28",
   networks: {
     hardhat: {
     chainId:  1337,
