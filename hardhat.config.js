@@ -8,7 +8,7 @@ module.exports = {
     hardhat: {
     chainId:  1337,
     },
-    liskSepoliaId: {
+    lisk: {
       chainId: 4202,
       url: "https://rpc.sepolia-api.lisk.com",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
