@@ -115,4 +115,16 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         emit MetadataUpdated(id, newUri);
     }
 
+    /**
+     * @dev Freezes the metadata for a token, making it immutable.
+     * @param id Token ID to freeze.
+     */
+    function freezeMetadata(uint256 id) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can freeze metadata");
+        require(_exists(id), "Token does not exist");
+        require(!_metadataFrozen[id], "Metadata already frozen");
+
+        _metadataFrozen[id] = true;
+        emit MetadataFrozen(id);
+    }
 }
