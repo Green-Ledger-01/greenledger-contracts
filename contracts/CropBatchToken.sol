@@ -127,4 +127,22 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         _metadataFrozen[id] = true;
         emit MetadataFrozen(id);
     }
+
+    /**
+     * @dev Grants the farmer role to an account.
+     * @param account Address to grant the role to.
+     */
+    function grantFarmerRole(address account) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can grant roles");
+        grantRole(FARMER_ROLE, account);
+    }
+
+    /**
+     * @dev Revokes the farmer role from an account.
+     * @param account Address to revoke the role from.
+     */
+    function revokeFarmerRole(address account) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can revoke roles");
+        revokeRole(FARMER_ROLW, account);
+    }
 }
