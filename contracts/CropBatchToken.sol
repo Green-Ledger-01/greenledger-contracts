@@ -165,4 +165,23 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         require(role != DEFAULT_ADMIN_ROLE, "Cannot renounce admin role");
         super.renounceRole(role, account);
     }
+
+    /**
+     * @dev Validates that a URI starts with "ipfs://".
+     * @param uriStr URI to validate.
+     */
+    function _validateIPFS(string memory uriStr) internal pure {
+        bytes memory uriBytes = bytes(uriStr);
+        require(uriBytes.length >= 7, "Invalid URI length");
+        require(
+            uriBytes[0] == "i" &&
+                uriBytes[1] == "p" &&
+                uriBytes[2] == "f" &&
+                uriBytes[3] == "s" &&
+                uriBytes[4] == ":" &&
+                uriBytes[5] == "/" &&
+                uriBytes[6] == "/" &&
+            "URI must start with 'ipfs://'"
+        )
+    }
 }
