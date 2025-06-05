@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.0;
 
 import "@thirdweb-dev/contracts/base/ERC1155Base.sol";
 import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
@@ -46,7 +46,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
      */
     function mint(string memory metadataUri, bytes memory data) public nonReentrant {
         require(hasRole(FARMER_ROLE, msg.sender), "Caller must be a farmer");
-        require(bytes(metadataUri).lenght > 0, "Metadata URI cannot be empty");
+        require(bytes(metadataUri).length > 0, "Metadata URI cannot be empty");
         _validateIPFS(metadataUri);
 
         uint256 id = _nextTokenId++;
@@ -70,7 +70,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
 
         for (uint256 i = 0; i < metadataUris.length; i++) {
             require(bytes(metadataUris[i]).length > 0, "Metadata URI cannot be empty");
-            _validateIPFS(metadataUri[i]);
+            _validateIPFS(metadataUris[i]);
 
             uint256 id = _nextTokenId++;
             _tokenUris[id] = metadataUris[i];
@@ -92,7 +92,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
      */
     function updateTokenUri(uint256 id, string memory newUri) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can update URI");
-        require(_exists(id), "Token does not exist");
+        require(exists(id), "Token does not exist");
         require(!_metadataFrozen[id], "Metadata is frozen");
         _validateIPFS(newUri);
 
@@ -107,7 +107,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
      */
     function updateTokenUri(uint256 id, string memory newUri) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can update URI");
-        require(_exists(id), "Token deos not exist");
+        require(exists(id), "Token deos not exist");
         require(!_metadataFrozen[id], "Metadata is frozen");
         _validateIPFS(newUri);
 
@@ -121,7 +121,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
      */
     function freezeMetadata(uint256 id) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can freeze metadata");
-        require(_exists(id), "Token does not exist");
+        require(exists(id), "Token does not exist");
         require(!_metadataFrozen[id], "Metadata already frozen");
 
         _metadataFrozen[id] = true;
@@ -143,7 +143,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
      */
     function revokeFarmerRole(address account) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can revoke roles");
-        revokeRole(FARMER_ROLW, account);
+        revokeRole(FARMER_ROLE, account);
     }
 
     /**
@@ -185,13 +185,13 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Checks if a token exists.
-     * @param id Token ID to check.
-     */
-    function exists(uint256 id) public view returns (bool) {
-        return _exists(id);
-    } 
+    // /**
+    //  * @dev Checks if a token exists.
+    //  * @param id Token ID to check.
+    //  */
+    // function exists(uint256 id) public view returns (bool) {
+    //     return _exists(id);
+    // } 
 
     /**
      * @dev Supports ERC165 interface detection.
