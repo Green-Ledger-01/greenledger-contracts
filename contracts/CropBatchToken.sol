@@ -182,6 +182,27 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
                 uriBytes[5] == "/" &&
                 uriBytes[6] == "/" &&
             "URI must start with 'ipfs://'"
-        )
+        );
     }
+
+    /**
+     * @dev Checks if a token exists.
+     * @param id Token ID to check.
+     */
+    function exists(uint256 id) public view returns (bool) {
+        return _exists(id);
+    } 
+
+    /**
+     * @dev Supports ERC165 interface detection.
+     * @param interfacedId interface ID to check.
+     */
+    function supportsInterface(bytes4 interfaceId)
+        public 
+        view
+        virtual
+        override(ERC1155Base, PermissionsEnumerable)
+        returns (bool) {
+            return super.supportsInterface(interfaceId);
+        }
 }
