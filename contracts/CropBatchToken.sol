@@ -23,5 +23,9 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
     // Auto-incrementing token ID
     uint256 private _nextTokenId = 1;
 
+    // Events for tracking
+    event CropBatchMinted(uint256 indexed tokenId, address indexed farmer, string metadataUri);
+    event MetadataUpdated(uint256 indexed tokenId, string newUri);
+    event MetadataFrozen(uint256 indexed tokenId);
     
 }
