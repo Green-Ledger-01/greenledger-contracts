@@ -68,7 +68,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         uint256[] memory ids = new uint256[](metadataUris.length);
         uint256[] memory amounts = new uint256[](metadataUris.length);
 
-        for (uint256 i = 0; i < metadataUris.lenth; i++) {
+        for (uint256 i = 0; i < metadataUris.length; i++) {
             require(bytes(metadataUris[i]).length > 0, "Metadata URI cannot be empty");
             _validateIPFS(metadataUri[i]);
 
@@ -84,5 +84,22 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
             emit CropBatchMinted(ids[i], msg.sender, metadataUris[i]);
         }
     }
+
+    /**
+     * @dev Updates the metadata URI for a token if not frozen.
+     * @param id Token ID to update.
+     * @param newUri New IPFS URI.
+     */
+    function updateTokenUri(uint256 id, string memory newUri) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can update URI");
+        require(_exists(id), "Token does not exist");
+        require(!_metadataFrozen[id], "Metadata is frozen");
+        _validateIPFS(newUri);
+
+        _tokensUris[id] = newUri;
+        emit MetadataUpdated(id, newUri);
+    }
+
+    
 
 }
