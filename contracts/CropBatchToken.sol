@@ -100,6 +100,19 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         emit MetadataUpdated(id, newUri);
     }
 
-    
+    /**
+     * @dev Updates the metadata URI for a token if not frozen.
+     * @param id Token ID to update.
+     * @param newUri New IPFS URI.
+     */
+    function updateTokenUri(uint256 id, string memory newUri) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can update URI");
+        require(_exists(id), "Token deos not exist");
+        require(!_metadataFrozen[id], "Metadata is frozen");
+        _validateIPFS(newUri);
+
+        _tokenUris[id] = newUri;
+        emit MetadataUpdated(id, newUri);
+    }
 
 }
