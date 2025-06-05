@@ -145,4 +145,13 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can revoke roles");
         revokeRole(FARMER_ROLW, account);
     }
+
+    /**
+     * @dev Revokes the farmer role from an account.
+     * @param account Address to revoke the role from.
+     */
+    function revokeFarmerRole(address account) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can revoke roles");
+        revokeRole(FARMER_ROLE, account);
+    }
 }
