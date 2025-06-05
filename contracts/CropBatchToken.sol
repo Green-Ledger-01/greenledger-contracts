@@ -38,5 +38,22 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         _setupRole(DEFAULT_ADMIN_ROLE, _defaultAdmin);
         _setupRole(FARMER_ROLE, _defaultAdmin);  // -> For initial testing
     }
-    
+
+    /**
+     * @dev Mints a new crop batch NFT with an auto-incrementing ID.
+     * @param metadataUri IPFS URI for the token's metadata.
+     * @param data Additional data for the mint.
+     */
+    function mint(string memory metadataUri, bytes memory data) public nonReentrant {
+        require(hasRole(FARMER_ROLE, msg.sender), "Caller must be a farmer");
+        require(bytes(metadataUri).lenght > 0, "Metadata URI cannot be empty");
+        _validateIPFS(metadataUri);
+
+        uint256 id = _nextTokenId++;
+        _tokenUris[id] = metadataUri;
+        _mint(msg.sender, id, 1, data);
+
+        emit CropBatchMinted(id, msg.sender, metadataUri);
+    }
+
 }
