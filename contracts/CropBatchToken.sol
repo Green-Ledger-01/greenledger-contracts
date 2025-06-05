@@ -11,5 +11,17 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * Each token ID represents a unique batch with a supply of 1.
  */ 
 contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
+    // Role for farmers who can mint tokens
+    bytes32 public constant FARMER_ROLE = keccak256("FARMER_ROLE");
+
+    // Metadata URIs for each token 
+    mapping(uint256 => string) private _tokensUris;
+
+    // Track if metadata is frozen
+    mapping(uint256 => bool) private _metadataFrozen;
+
+    // Auto-incrementing token ID
+    uint256 private _nextTokenId = 1;
+
     
 }
