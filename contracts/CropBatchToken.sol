@@ -27,5 +27,16 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
     event CropBatchMinted(uint256 indexed tokenId, address indexed farmer, string metadataUri);
     event MetadataUpdated(uint256 indexed tokenId, string newUri);
     event MetadataFrozen(uint256 indexed tokenId);
+
+    constructor(
+        address _defaultAdmin,
+        string memory _name,
+        string memory _symbol,
+        address _royaltyRecipient,
+        uint128 _royaltyBps
+    ) ERC1155Base(_defaultAdmin, _name, _symbol, _royaltyRecipient, _royaltyBps) {
+        _setupRole(DEFAULT_ADMIN_ROLE, _defaultAdmin);
+        _setupRole(FARMER_ROLE, _defaultAdmin);  // -> For initial testing
+    }
     
 }
