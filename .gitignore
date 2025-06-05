@@ -13,7 +13,7 @@ states/
 # Optional
 .env
 .env.local
-node_modules
+gnode_modules
 .env
 
 # Hardhat files
