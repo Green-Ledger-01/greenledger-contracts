@@ -5,7 +5,7 @@ require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.0",
+  solidity: "0.8.26",
   networks: {
     hardhat: {
     chainId:  1337,
@@ -21,5 +21,6 @@ module.exports = {
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts",
+    root: "./"
   },
 };
