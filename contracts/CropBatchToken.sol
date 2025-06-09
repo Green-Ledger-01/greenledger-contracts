@@ -15,7 +15,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
     bytes32 public constant FARMER_ROLE = keccak256("FARMER_ROLE");
 
     // Metadata URIs for each token 
-    mapping(uint256 => string) private _tokensUris;
+    mapping(uint256 => string) private _tokenUris;
 
     // Track if metadata is frozen
     mapping(uint256 => bool) private _metadataFrozen;
@@ -96,21 +96,6 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         require(!_metadataFrozen[id], "Metadata is frozen");
         _validateIPFS(newUri);
 
-        _tokensUris[id] = newUri;
-        emit MetadataUpdated(id, newUri);
-    }
-
-    /**
-     * @dev Updates the metadata URI for a token if not frozen.
-     * @param id Token ID to update.
-     * @param newUri New IPFS URI.
-     */
-    function updateTokenUri(uint256 id, string memory newUri) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can update URI");
-        require(exists(id), "Token deos not exist");
-        require(!_metadataFrozen[id], "Metadata is frozen");
-        _validateIPFS(newUri);
-
         _tokenUris[id] = newUri;
         emit MetadataUpdated(id, newUri);
     }
@@ -146,16 +131,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         revokeRole(FARMER_ROLE, account);
     }
 
-    /**
-     * @dev Revokes the farmer role from an account.
-     * @param account Address to revoke the role from.
-     */
-    function revokeFarmerRole(address account) public {
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can revoke roles");
-        revokeRole(FARMER_ROLE, account);
-    }
-
-    /**
+     /**
      * @dev Allows users to renounse non-admin roles.
      * @param role Role to renounce.
      * @param account Account renouncing the role.
@@ -174,7 +150,8 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         bytes memory uriBytes = bytes(uriStr);
         require(uriBytes.length >= 7, "Invalid URI length");
         require(
-            uriBytes[0] == "i" &&
+            uriBytes.length >= 7 &&
+                uriBytes[0] >= 'i' &&
                 uriBytes[1] == "p" &&
                 uriBytes[2] == "f" &&
                 uriBytes[3] == "s" &&
@@ -189,13 +166,13 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
     //  * @dev Checks if a token exists.
     //  * @param id Token ID to check.
     //  */
-    // function exists(uint256 id) public view returns (bool) {
-    //     return _exists(id);
-    // } 
+    function exists(uint256 id) public view returns (bool) {
+        return _exists(id);
+    } 
 
     /**
      * @dev Supports ERC165 interface detection.
-     * @param interfacedId interface ID to check.
+     * @param interfaceId interface ID to check.
      */
     function supportsInterface(bytes4 interfaceId)
         public 
