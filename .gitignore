@@ -13,8 +13,8 @@ states/
 # Optional
 .env
 .env.local
-gnode_modules
 .env
+
 
 # Hardhat files
 /cache
@@ -31,4 +31,7 @@ gnode_modules
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
 
-/node_modules
+#/node_modules
+.qodo
+
+node_modules
