@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@thirdweb-dev/contracts/base/ERC1155Base.sol";
-import "@thirdweb-dev/contracts/extension/PermissionsEnumerable.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/common/ERC2981.sol";
 
 /**
  * @title CropBatchToken
- * @dev ERC1155 contract for tokenizing for tokenizing unique crop batches as NFTs for GreenLedger.
+ * @dev ERC1155 contract for tokenizing unique crop batches as NFTs for GreenLedger.
  * Each token ID represents a unique batch with a supply of 1.
- */ 
-contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
+ */
+contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
     // Role for farmers who can mint tokens
     bytes32 public constant FARMER_ROLE = keccak256("FARMER_ROLE");
+    uint256 public constant MAX_BATCH_SIZE = 100;
 
     // Metadata URIs for each token 
     mapping(uint256 => string) private _tokenUris;
@@ -30,13 +32,12 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
 
     constructor(
         address _defaultAdmin,
-        string memory _name,
-        string memory _symbol,
+        string memory _uri,
         address _royaltyRecipient,
-        uint128 _royaltyBps
-    ) ERC1155Base(_defaultAdmin, _name, _symbol, _royaltyRecipient, _royaltyBps) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _defaultAdmin);
-        _setupRole(FARMER_ROLE, _defaultAdmin);  // -> For initial testing
+        uint96 _royaltyBps
+    ) ERC1155(_uri) {
+        _grantRole(DEFAULT_ADMIN_ROLE, _defaultAdmin);
+        _setDefaultRoyalty(_royaltyRecipient, _royaltyBps);
     }
 
     /**
@@ -56,7 +57,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         emit CropBatchMinted(id, msg.sender, metadataUri);
     }
 
-    /**
+  /**
      * @dev Batch mints multiple NFTs with auto-incrementing IDs.
      * @param metadataUris Array of IPFS URIs for the tokens' metadata.
      * @param data Additional data for the mint.
@@ -64,6 +65,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
     function batchMint(string[] memory metadataUris, bytes memory data) public nonReentrant {
         require(hasRole(FARMER_ROLE, msg.sender), "Caller must be a farmer");
         require(metadataUris.length > 0, "No metadata URIs provided");
+        require(metadataUris.length <= MAX_BATCH_SIZE, "Batch size exceeds limit");
 
         uint256[] memory ids = new uint256[](metadataUris.length);
         uint256[] memory amounts = new uint256[](metadataUris.length);
@@ -119,7 +121,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
      */
     function grantFarmerRole(address account) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can grant roles");
-        grantRole(FARMER_ROLE, account);
+        _grantRole(FARMER_ROLE, account);
     }
 
     /**
@@ -128,7 +130,7 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
      */
     function revokeFarmerRole(address account) public {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can revoke roles");
-        revokeRole(FARMER_ROLE, account);
+        _revokeRole(FARMER_ROLE, account);
     }
 
      /**
@@ -150,35 +152,43 @@ contract CropBatchToken is ERC1155Base, PermissionsEnumerable, ReentrancyGuard {
         bytes memory uriBytes = bytes(uriStr);
         require(uriBytes.length >= 7, "Invalid URI length");
         require(
-            uriBytes.length >= 7 &&
-                uriBytes[0] >= 'i' &&
-                uriBytes[1] == "p" &&
-                uriBytes[2] == "f" &&
-                uriBytes[3] == "s" &&
-                uriBytes[4] == ":" &&
-                uriBytes[5] == "/" &&
-                uriBytes[6] == "/" &&
+            uriBytes[0] == 'i' &&
+            uriBytes[1] == 'p' &&
+            uriBytes[2] == 'f' &&
+            uriBytes[3] == 's' &&
+            uriBytes[4] == ':' &&
+            uriBytes[5] == '/' &&
+            uriBytes[6] == '/',
             "URI must start with 'ipfs://'"
         );
     }
 
-    // /**
-    //  * @dev Checks if a token exists.
-    //  * @param id Token ID to check.
-    //  */
+    /**
+     * @dev Checks if a token exists.
+     * @param id Token ID to check.
+     */
     function exists(uint256 id) public view returns (bool) {
-        return _exists(id);
-    } 
+        return _nextTokenId > id;
+    }
+
+    /**
+     * @dev Returns the URI for a given token ID.
+     * @param tokenId Token ID to get URI for.
+     */
+    function uri(uint256 tokenId) public view virtual override returns (string memory) {
+        require(exists(tokenId), "Token does not exist");
+        return _tokenUris[tokenId];
+    }
 
     /**
      * @dev Supports ERC165 interface detection.
      * @param interfaceId interface ID to check.
      */
     function supportsInterface(bytes4 interfaceId)
-        public 
+        public
         view
         virtual
-        override(ERC1155Base, PermissionsEnumerable)
+        override(ERC1155, AccessControl, ERC2981)
         returns (bool) {
             return super.supportsInterface(interfaceId);
         }
