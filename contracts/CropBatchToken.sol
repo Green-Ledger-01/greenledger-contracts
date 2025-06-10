@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/common/ERC2981.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/interfaces/IERC165.sol";
 
 /**
  * @title CropBatchToken
  * @dev ERC1155 contract for tokenizing unique crop batches as NFTs for GreenLedger.
  * Each token ID represents a unique batch with a supply of 1.
  */
-contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
+contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, Ownable {
     // Role for farmers who can mint tokens
     bytes32 public constant FARMER_ROLE = keccak256("FARMER_ROLE");
     uint256 public constant MAX_BATCH_SIZE = 100;
 
-    // Metadata URIs for each token 
+    // Metadata URIs for each token
     mapping(uint256 => string) private _tokenUris;
 
     // Track if metadata is frozen
@@ -25,19 +26,56 @@ contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
     // Auto-incrementing token ID
     uint256 private _nextTokenId = 1;
 
-    // Events for tracking
+    // Royalty information
+    address private _royaltyRecipient;
+    uint96 private _royaltyBps;
+
+    // ERC2981 interface ID
+    bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
+
+    // // Events for tracking
     event CropBatchMinted(uint256 indexed tokenId, address indexed farmer, string metadataUri);
     event MetadataUpdated(uint256 indexed tokenId, string newUri);
     event MetadataFrozen(uint256 indexed tokenId);
+    event RoyaltyInfoUpdated(address recipient, uint96 bps);
 
     constructor(
-        address _defaultAdmin,
-        string memory _uri,
-        address _royaltyRecipient,
-        uint96 _royaltyBps
-    ) ERC1155(_uri) {
-        _grantRole(DEFAULT_ADMIN_ROLE, _defaultAdmin);
-        _setDefaultRoyalty(_royaltyRecipient, _royaltyBps);
+        address defaultAdmin,
+        string memory _initialURI,
+        address royaltyRecipient_,
+        uint96 royaltyBps_
+    ) ERC1155(_initialURI) Ownable(defaultAdmin) { 
+        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
+        _grantRole(FARMER_ROLE, defaultAdmin);
+        _setRoyaltyInfo(royaltyRecipient_, royaltyBps_);
+    }
+
+    /**
+     * @dev Sets royalty information for all tokens
+     * @param recipient Address to receive royalties
+     * @param bps Basis points (1/100 of a percent) for royalty amount
+     */
+    function _setRoyaltyInfo(address recipient, uint96 bps) internal {
+        require(bps <= 10000, "Royalty too high");
+        _royaltyRecipient = recipient;
+        _royaltyBps = bps;
+        emit RoyaltyInfoUpdated(recipient, bps);
+    }
+
+    /**
+     * @dev Updates royalty information
+     * @param recipient Address to receive royalties
+     * @param bps Basis points for royalty amount
+     */
+    function setRoyaltyInfo(address recipient, uint96 bps) external onlyOwner {
+        _setRoyaltyInfo(recipient, bps);
+    }
+
+    /**
+     * @dev ERC2981 royalty info implementation
+     */
+    function royaltyInfo(uint256, uint256 salePrice) external view returns (address, uint256) {
+        return (_royaltyRecipient, (salePrice * _royaltyBps) / 10000);
     }
 
     /**
@@ -53,7 +91,6 @@ contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
         uint256 id = _nextTokenId++;
         _tokenUris[id] = metadataUri;
         _mint(msg.sender, id, 1, data);
-
         emit CropBatchMinted(id, msg.sender, metadataUri);
     }
 
@@ -73,7 +110,6 @@ contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
         for (uint256 i = 0; i < metadataUris.length; i++) {
             require(bytes(metadataUris[i]).length > 0, "Metadata URI cannot be empty");
             _validateIPFS(metadataUris[i]);
-
             uint256 id = _nextTokenId++;
             _tokenUris[id] = metadataUris[i];
             ids[i] = id;
@@ -110,7 +146,6 @@ contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only admin can freeze metadata");
         require(exists(id), "Token does not exist");
         require(!_metadataFrozen[id], "Metadata already frozen");
-
         _metadataFrozen[id] = true;
         emit MetadataFrozen(id);
     }
@@ -134,7 +169,7 @@ contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
     }
 
      /**
-     * @dev Allows users to renounse non-admin roles.
+     * @dev Allows users to renounce non-admin roles.
      * @param role Role to renounce.
      * @param account Account renouncing the role.
      */
@@ -168,7 +203,7 @@ contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
      * @param id Token ID to check.
      */
     function exists(uint256 id) public view returns (bool) {
-        return _nextTokenId > id;
+        return id > 0 && id < _nextTokenId;
     }
 
     /**
@@ -188,8 +223,25 @@ contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, ERC2981 {
         public
         view
         virtual
-        override(ERC1155, AccessControl, ERC2981)
+        override(ERC1155, AccessControl)
         returns (bool) {
-            return super.supportsInterface(interfaceId);
-        }
+            return
+                interfaceId == _INTERFACE_ID_ERC2981 ||
+                super.supportsInterface(interfaceId);
+    }
+
+    /**
+     * @dev Returns the next token ID to be minted.
+     */
+    function nextTokenId() public view returns (uint256) {
+        return _nextTokenId;
+    }
+
+    /**
+     * @dev Checks if metadata is frozen for a token.
+     * @param id Token ID to check.
+     */
+    function isMetadataFrozen(uint256 id) public view returns (bool) {
+        return _metadataFrozen[id];
+    }
 }
