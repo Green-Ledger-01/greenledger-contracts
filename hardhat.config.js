@@ -6,10 +6,10 @@ require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.19",
+  solidity: "0.8.20",
   networks: {
     hardhat: {
-    chainId:  1337,
+      chainId: 1337,
     },
     lisk: {
       chainId: 4202,
