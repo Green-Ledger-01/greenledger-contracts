@@ -8,12 +8,15 @@
     "compile": "hardhat compile"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "hardhat": "^2.24.1"
+    "@nomiclabs/hardhat-ethers": "^2.0.0",
+    "@nomiclabs/hardhat-waffle": "^2.0.0",
+    "chai": "^4.2.0",
+    "ethereum-waffle": "^3.0.0",
+    "ethers": "^5.0.0",
+    "hardhat": "^2.12.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.0.0",
-    "@thirdweb-dev/contracts": "^3.15.0",
-    "dotenv": "^16.5.0"
+    "@openzeppelin/contracts": "^4.8.0",
+    "dotenv": "^16.0.0"
   }
 }
