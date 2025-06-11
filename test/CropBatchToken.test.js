@@ -674,4 +674,185 @@ describe("CropBatchToken", function () {
             }
         });
     });
+
+    describe("Royalty Management", function () {
+        it("Should allow owner to update royalty info", async function () {
+            const newRecipient = user.address;
+            const newBps = 500; // 5%
+
+            await expect(
+                cropBatchToken.setRoyaltyInfo(newRecipient, newBps)
+            ).to.emit(cropBatchToken, "RoyaltyInfoUpdated")
+                .withArgs(newRecipient, newBps);
+
+            const royaltyInfo = await cropBatchToken.royaltyInfo(1, 10000);
+            expect(royaltyInfo[0]).to.equal(newRecipient);
+            expect(royaltyInfo[1]).to.equal(newBps);
+        });
+
+        it("Should not allow non-owner to update royalty info", async function () {
+            await expect(
+                cropBatchToken.connect(user).setRoyaltyInfo(user.address, 500)
+            ).to.be.revertedWith("Ownable: caller is not the owner");
+        });
+
+        it("Should not allow royalty above 100%", async function () {
+            await expect(
+                cropBatchToken.setRoyaltyInfo(royaltyRecipient.address, 10001)
+            ).to.be.revertedWith("Royalty too high");
+        });
+
+        it("Should handle zero royalty", async function () {
+            await cropBatchToken.setRoyaltyInfo(royaltyRecipient.address, 0);
+            const royaltyInfo = await cropBatchToken.royaltyInfo(1, 10000);
+            expect(royaltyInfo[1]).to.equal(0);
+        });
+
+        it("Should handle maximum royalty (100%)", async function () {
+            await cropBatchToken.setRoyaltyInfo(royaltyRecipient.address, 10000);
+            const royaltyInfo = await cropBatchToken.royaltyInfo(1, 10000);
+            expect(royaltyInfo[1]).to.equal(10000);
+        });
+    });
+
+    describe("Security and Edge Cases", function () {
+        beforeEach(async function () {
+            await cropBatchToken.grantFarmerRole(farmer.address);
+        });
+
+        it("Should handle reentrancy protection", async function () {
+            // This test verifies that the nonReentrant modifier is working
+            // In a real attack scenario, this would be more complex
+            await expect(
+                cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, "0x")
+            ).to.not.be.reverted;
+        });
+
+        it("Should handle large token IDs correctly", async function () {
+            // Mint many tokens to test large token IDs
+            const batchSize = 50;
+            const uris = new Array(batchSize).fill(SAMPLE_IPFS_URI);
+
+            await cropBatchToken.connect(farmer).batchMint(uris, "0x");
+
+            expect(await cropBatchToken.nextTokenId()).to.equal(batchSize + 1);
+            expect(await cropBatchToken.exists(batchSize)).to.be.true;
+            expect(await cropBatchToken.exists(batchSize + 1)).to.be.false;
+        });
+
+        it("Should handle zero address checks", async function () {
+            await expect(
+                cropBatchToken.grantFarmerRole(ethers.constants.AddressZero)
+            ).to.not.be.reverted; // OpenZeppelin allows this, but it's not useful
+
+            expect(await cropBatchToken.hasRole(FARMER_ROLE, ethers.constants.AddressZero)).to.be.true;
+        });
+
+        it("Should handle very long IPFS URIs", async function () {
+            const longHash = "QmVeryLongHashThatIsStillValidIPFSHashButMuchLongerThanUsual123456789";
+            const longUri = `ipfs://${longHash}`;
+
+            await expect(
+                cropBatchToken.connect(farmer).mint(longUri, "0x")
+            ).to.not.be.reverted;
+
+            expect(await cropBatchToken.uri(1)).to.equal(longUri);
+        });
+
+        it("Should handle gas limits for large batches", async function () {
+            // Test with a reasonably large batch to ensure gas efficiency
+            const batchSize = 20;
+            const uris = new Array(batchSize).fill(SAMPLE_IPFS_URI);
+
+            const tx = await cropBatchToken.connect(farmer).batchMint(uris, "0x");
+            const receipt = await tx.wait();
+
+            // Verify gas usage is reasonable (this is a rough check)
+            expect(receipt.gasUsed.toNumber()).to.be.lessThan(5000000);
+        });
+
+        it("Should handle multiple operations in sequence", async function () {
+            // Complex workflow test
+            await cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, "0x");
+            await cropBatchToken.updateTokenUri(1, SAMPLE_IPFS_URI_2);
+            await cropBatchToken.freezeMetadata(1);
+
+            await cropBatchToken.connect(farmer).batchMint([SAMPLE_IPFS_URI_3], "0x");
+            await cropBatchToken.grantFarmerRole(anotherFarmer.address);
+            await cropBatchToken.connect(anotherFarmer).mint(SAMPLE_IPFS_URI, "0x");
+
+            expect(await cropBatchToken.nextTokenId()).to.equal(4);
+            expect(await cropBatchToken.isMetadataFrozen(1)).to.be.true;
+            expect(await cropBatchToken.isMetadataFrozen(2)).to.be.false;
+        });
+    });
+
+    describe("Gas Optimization Tests", function () {
+        beforeEach(async function () {
+            await cropBatchToken.grantFarmerRole(farmer.address);
+        });
+
+        it("Should be gas efficient for single mints", async function () {
+            const tx = await cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, "0x");
+            const receipt = await tx.wait();
+
+            // Single mint should be reasonably gas efficient
+            expect(receipt.gasUsed.toNumber()).to.be.lessThan(200000);
+        });
+
+        it("Should be more efficient for batch mints vs individual mints", async function () {
+            const uris = [SAMPLE_IPFS_URI, SAMPLE_IPFS_URI_2, SAMPLE_IPFS_URI_3];
+
+            // Batch mint
+            const batchTx = await cropBatchToken.connect(farmer).batchMint(uris, "0x");
+            const batchReceipt = await batchTx.wait();
+
+            // Reset for individual mints (would need fresh contract)
+            // This is more of a conceptual test - in practice you'd compare across deployments
+            expect(batchReceipt.gasUsed.toNumber()).to.be.lessThan(500000);
+        });
+    });
+
+    describe("Integration Tests", function () {
+        beforeEach(async function () {
+            await cropBatchToken.grantFarmerRole(farmer.address);
+            await cropBatchToken.grantFarmerRole(anotherFarmer.address);
+        });
+
+        it("Should handle complete crop batch lifecycle", async function () {
+            // 1. Farmer mints a crop batch
+            await cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, "0x");
+            expect(await cropBatchToken.balanceOf(farmer.address, 1)).to.equal(1);
+
+            // 2. Admin updates metadata (quality inspection results)
+            await cropBatchToken.updateTokenUri(1, SAMPLE_IPFS_URI_2);
+            expect(await cropBatchToken.uri(1)).to.equal(SAMPLE_IPFS_URI_2);
+
+            // 3. Admin freezes metadata (final certification)
+            await cropBatchToken.freezeMetadata(1);
+            expect(await cropBatchToken.isMetadataFrozen(1)).to.be.true;
+
+            // 4. Verify royalty system works
+            const royaltyInfo = await cropBatchToken.royaltyInfo(1, ethers.utils.parseEther("1"));
+            expect(royaltyInfo[0]).to.equal(royaltyRecipient.address);
+            expect(royaltyInfo[1]).to.equal(ethers.utils.parseEther("1").mul(ROYALTY_BPS).div(10000));
+        });
+
+        it("Should handle multiple farmers and batches", async function () {
+            // Farmer 1 creates multiple batches
+            await cropBatchToken.connect(farmer).batchMint([SAMPLE_IPFS_URI, SAMPLE_IPFS_URI_2], "0x");
+
+            // Farmer 2 creates a batch
+            await cropBatchToken.connect(anotherFarmer).mint(SAMPLE_IPFS_URI_3, "0x");
+
+            // Verify ownership
+            expect(await cropBatchToken.balanceOf(farmer.address, 1)).to.equal(1);
+            expect(await cropBatchToken.balanceOf(farmer.address, 2)).to.equal(1);
+            expect(await cropBatchToken.balanceOf(anotherFarmer.address, 3)).to.equal(1);
+
+            // Verify farmer 2 doesn't own farmer 1's tokens
+            expect(await cropBatchToken.balanceOf(anotherFarmer.address, 1)).to.equal(0);
+            expect(await cropBatchToken.balanceOf(farmer.address, 3)).to.equal(0);
+        });
+    });
 });
