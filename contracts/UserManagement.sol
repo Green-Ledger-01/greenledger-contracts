@@ -70,5 +70,20 @@ contract UserManagement is AccessControl {
         // Note: AccessControl automatically emits a RoleRevoked event.
     }
 
-    
+    /**
+     * @dev Returns the role status of a user for Farmer, Transporter, and Buyer roles.
+     * @param _user The address of the user to check.
+     * @return isFarmer True if the user has the FARMER_ROLE.
+     * @return isTransporter True if the user has the TRANSPORTER_ROLE.
+     * @return isBuyer True if the user has the BUYER_ROLE.
+     */
+    function getUserRolesStatus(address _user)
+        public
+        view
+        returns (bool isFarmer, bool isTransporter, bool isBuyer)
+    {
+        isFarmer = hasRole(FARMER_ROLE, _user);
+        isTransporter = hasRole(TRANSPORTER_ROLE, _user);
+        isBuyer = hasRole(BUYER_ROLE, _user);
+    }
 }
