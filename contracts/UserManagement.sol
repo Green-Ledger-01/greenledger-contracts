@@ -9,5 +9,16 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  * using OpenZeppelin's AccessControl.
  */
 contract UserManagement is AccessControl {
-   
+    // These roles are managed by the DEFAULT_ADMIN_ROLE of this contract.
+    bytes32 public constant FARMER_ROLE = keccak256("FARMER_ROLE");
+    bytes32 public constant TRANSPORTER_ROLE = keccak256("TRANSPORTER_ROLE");
+    bytes32 public constant BUYER_ROLE = keccak256("BUYER_ROLE");
+
+    enum UserRole {
+        Farmer,
+        Transporter,
+        Buyer
+    }
+
+    
 }
