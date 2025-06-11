@@ -58,5 +58,17 @@ contract UserManagement is AccessControl {
         _grantRole(roleBytes, _user);
     }
 
+    /**
+     * @dev Revokes a specific role from a user.
+     * Only accounts with the DEFAULT_ADMIN_ROLE (for this contract) can call this function.
+     * @param _user The address of the user from whom to revoke the role.
+     * @param _role The role to revoke (Farmer, Transporter, Buyer).
+     */
+    function revokeRole(address _user, UserRole _role) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 roleBytes = _getRoleBytes(_role);
+        _revokeRole(roleBytes, _user);
+        // Note: AccessControl automatically emits a RoleRevoked event.
+    }
+
     
 }
