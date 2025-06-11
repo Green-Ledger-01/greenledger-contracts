@@ -2,14 +2,14 @@ const { ethers } = require("ethers");
 const fs = require("fs");
 const path = require("path");
 
-// Simple deployment script that works without Hardhat network issues
+// deployment script
 async function deployContract() {
     console.log("🌱 Deploying CropBatchToken contract...\n");
 
-    // Create a local provider (you can change this to connect to a real network)
+    // Create a local provider
     const provider = new ethers.providers.JsonRpcProvider("http://127.0.0.1:8545");
     
-    // Create a wallet (you should use a proper private key for real deployment)
+    // Create a wallet 
     const privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // Default Hardhat account
     const wallet = new ethers.Wallet(privateKey, provider);
     
@@ -62,7 +62,7 @@ async function deployContract() {
             royaltyRecipient,
             royaltyBps,
             {
-                gasLimit: 3000000 // Set a reasonable gas limit
+                gasLimit: 3000000 //gas limit
             }
         );
 
@@ -103,7 +103,7 @@ async function deployContract() {
             contractAddress: contract.address,
             transactionHash: contract.deployTransaction.hash,
             deployerAddress: wallet.address,
-            network: "local", // Change this based on your network
+            network: "local", 
             deployedAt: new Date().toISOString(),
             constructorArgs: {
                 defaultAdmin,
