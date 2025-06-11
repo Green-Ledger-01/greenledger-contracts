@@ -32,5 +32,21 @@ contract UserManagement is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
     }
 
-    
+    /**
+     * @dev Internal helper function to convert the UserRole enum to its bytes32 constant.
+     * @param _role The UserRole enum value.
+     * @return The bytes32 representation of the role.
+     */
+    function _getRoleBytes(UserRole _role) internal pure returns (bytes32) {
+        if (_role == UserRole.Farmer) {
+            return FARMER_ROLE;
+        } else if (_role == UserRole.Transporter) {
+            return TRANSPORTER_ROLE;
+        } else if (_role == UserRole.Buyer) {
+            return BUYER_ROLE;
+        }
+        revert("UserManagement: Invalid role"); 
+    }
+
+   
 }
