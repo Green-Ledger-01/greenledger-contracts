@@ -33,7 +33,7 @@ contract CropBatchToken is ERC1155, AccessControl, ReentrancyGuard, Ownable {
     // ERC2981 interface ID
     bytes4 private constant _INTERFACE_ID_ERC2981 = 0x2a55205a;
 
-    // // Events for tracking
+    // Events for tracking
     event CropBatchMinted(uint256 indexed tokenId, address indexed farmer, string metadataUri);
     event MetadataUpdated(uint256 indexed tokenId, string newUri);
     event MetadataFrozen(uint256 indexed tokenId);
