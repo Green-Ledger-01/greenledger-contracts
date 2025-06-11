@@ -20,5 +20,17 @@ contract UserManagement is AccessControl {
         Buyer
     }
 
+    /**
+     * @dev Constructor to initialize the contract.
+     * The deployer of this contract will automatically be granted the DEFAULT_ADMIN_ROLE,
+     * which allows them to grant and revoke other roles (FARMER_ROLE, etc.).
+     * @param defaultAdmin The address to grant the initial DEFAULT_ADMIN_ROLE to.
+     * Typically, this is the address that deploys the contract.
+     */
+    constructor(address defaultAdmin) {
+        // Grant the deployer (or specified defaultAdmin) the admin role for this contract.
+        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
+    }
+
     
 }
