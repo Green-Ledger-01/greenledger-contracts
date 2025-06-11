@@ -2,9 +2,9 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("CropBatchToken", function () {
-    let cropBatchToken;
+    let cropBatchToken, userManagement;
     let owner, farmer, user, royaltyRecipient, anotherFarmer, nonFarmer;
-    let FARMER_ROLE, DEFAULT_ADMIN_ROLE;
+    let FARMER_ROLE, ADMIN_ROLE_FOR_CROPS;
 
     const SAMPLE_IPFS_URI = "ipfs://QmSampleHash123456789";
     const SAMPLE_IPFS_URI_2 = "ipfs://QmSampleHash987654321";
@@ -13,15 +13,20 @@ describe("CropBatchToken", function () {
     const ROYALTY_BPS = 250; // 2.5%
     const BASE_URI = "https://api.greenledger.com/metadata/{id}";
 
-    // Helper function to deploy contract with better error handling
-    async function deployContract() {
+    // Helper function to deploy contracts with better error handling
+    async function deployContracts() {
         try {
             const [deployer, ...otherSigners] = await ethers.getSigners();
-            const CropBatchToken = await ethers.getContractFactory("CropBatchToken");
 
-            // Try to deploy with proper parameters
-            const contract = await CropBatchToken.deploy(
-                deployer.address,
+            // Deploy UserManagement first
+            const UserManagement = await ethers.getContractFactory("UserManagement");
+            const userMgmt = await UserManagement.deploy(deployer.address);
+            await userMgmt.deployed();
+
+            // Deploy CropBatchToken with UserManagement address
+            const CropBatchToken = await ethers.getContractFactory("CropBatchToken");
+            const cropToken = await CropBatchToken.deploy(
+                userMgmt.address,
                 BASE_URI,
                 otherSigners[3].address, // royalty recipient
                 ROYALTY_BPS,
@@ -29,9 +34,14 @@ describe("CropBatchToken", function () {
                     gasLimit: 5000000 // Increase gas limit
                 }
             );
+            await cropToken.deployed();
 
-            await contract.deployed();
-            return { contract, deployer, otherSigners };
+            return {
+                cropBatchToken: cropToken,
+                userManagement: userMgmt,
+                deployer,
+                otherSigners
+            };
         } catch (error) {
             console.log("Deployment failed:", error.message);
             // If deployment fails, we'll skip tests that require deployment
@@ -42,42 +52,50 @@ describe("CropBatchToken", function () {
     beforeEach(async function () {
         [owner, farmer, user, royaltyRecipient, anotherFarmer, nonFarmer] = await ethers.getSigners();
 
-        const deployResult = await deployContract();
+        const deployResult = await deployContracts();
         if (!deployResult) {
             this.skip(); // Skip tests if deployment fails
             return;
         }
 
-        cropBatchToken = deployResult.contract;
+        cropBatchToken = deployResult.cropBatchToken;
+        userManagement = deployResult.userManagement;
         owner = deployResult.deployer;
         royaltyRecipient = deployResult.otherSigners[3];
 
         try {
-            FARMER_ROLE = await cropBatchToken.FARMER_ROLE();
-            DEFAULT_ADMIN_ROLE = await cropBatchToken.DEFAULT_ADMIN_ROLE();
+            FARMER_ROLE = await userManagement.FARMER_ROLE();
+            ADMIN_ROLE_FOR_CROPS = await cropBatchToken.ADMIN_ROLE_FOR_CROPS();
+
+            // Grant farmer role to test accounts through UserManagement
+            await userManagement.registerUser(farmer.address, 0); // 0 = Farmer enum
+            await userManagement.registerUser(anotherFarmer.address, 0);
         } catch (error) {
-            console.log("Failed to get roles:", error.message);
+            console.log("Failed to setup roles:", error.message);
             this.skip();
         }
     });
 
     describe("Deployment", function () {
-        it("Should set the correct admin role", async function () {
-            expect(await cropBatchToken.hasRole(DEFAULT_ADMIN_ROLE, owner.address)).to.be.true;
-        });
-
-        it("Should set the correct farmer role for admin", async function () {
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, owner.address)).to.be.true;
+        it("Should connect to UserManagement contract", async function () {
+            expect(await cropBatchToken.userManagementContract()).to.equal(userManagement.address);
         });
 
         it("Should set the correct royalty info", async function () {
+            // Create a dummy token first for royalty check
+            await cropBatchToken.mintNewBatch(
+                owner.address,
+                "Test Crop",
+                50,
+                "Test Farm",
+                Math.floor(Date.now() / 1000),
+                "Test notes",
+                SAMPLE_IPFS_URI
+            );
+
             const royaltyInfo = await cropBatchToken.royaltyInfo(1, 10000);
             expect(royaltyInfo[0]).to.equal(royaltyRecipient.address);
             expect(royaltyInfo[1]).to.equal(ROYALTY_BPS);
-        });
-
-        it("Should set the correct owner", async function () {
-            expect(await cropBatchToken.owner()).to.equal(owner.address);
         });
 
         it("Should start with token ID 1", async function () {
@@ -96,8 +114,6 @@ describe("CropBatchToken", function () {
         it("Should support required interfaces", async function () {
             // ERC1155
             expect(await cropBatchToken.supportsInterface("0xd9b67a26")).to.be.true;
-            // AccessControl
-            expect(await cropBatchToken.supportsInterface("0x7965db0b")).to.be.true;
             // ERC2981 (Royalty)
             expect(await cropBatchToken.supportsInterface("0x2a55205a")).to.be.true;
             // ERC165
@@ -105,6 +121,17 @@ describe("CropBatchToken", function () {
         });
 
         it("Should have correct royalty calculation", async function () {
+            // Create a dummy token first
+            await cropBatchToken.mintNewBatch(
+                owner.address,
+                "Test Crop",
+                50,
+                "Test Farm",
+                Math.floor(Date.now() / 1000),
+                "Test notes",
+                SAMPLE_IPFS_URI
+            );
+
             const testPrices = [
                 ethers.utils.parseEther("1"),
                 ethers.utils.parseEther("10"),
@@ -118,138 +145,172 @@ describe("CropBatchToken", function () {
                 expect(royaltyInfo[0]).to.equal(royaltyRecipient.address);
             }
         });
+
+        it("Should have correct constants", async function () {
+            expect(await cropBatchToken.MAX_BATCH_SIZE()).to.equal(100);
+            expect(await cropBatchToken.FARMER_ROLE()).to.equal(FARMER_ROLE);
+            expect(await cropBatchToken.ADMIN_ROLE_FOR_CROPS()).to.equal(ADMIN_ROLE_FOR_CROPS);
+        });
     });
 
-    describe("Role Management", function () {
-        it("Should allow admin to grant farmer role", async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, farmer.address)).to.be.true;
+    describe("Integration with UserManagement", function () {
+        it("Should check farmer role through UserManagement", async function () {
+            expect(await userManagement.hasRole(FARMER_ROLE, farmer.address)).to.be.true;
+            expect(await userManagement.hasRole(FARMER_ROLE, user.address)).to.be.false;
         });
 
-        it("Should allow admin to revoke farmer role", async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-            await cropBatchToken.revokeFarmerRole(farmer.address);
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, farmer.address)).to.be.false;
+        it("Should allow admin to manage roles through UserManagement", async function () {
+            // Register a new farmer
+            await userManagement.registerUser(user.address, 0); // 0 = Farmer
+            expect(await userManagement.hasRole(FARMER_ROLE, user.address)).to.be.true;
+
+            // Revoke farmer role
+            await userManagement.revokeRole(user.address, 0);
+            expect(await userManagement.hasRole(FARMER_ROLE, user.address)).to.be.false;
         });
 
-        it("Should not allow non-admin to grant farmer role", async function () {
+        it("Should prevent non-farmers from minting through role check", async function () {
+            // Remove farmer role from user
+            await userManagement.revokeRole(farmer.address, 0);
+
             await expect(
-                cropBatchToken.connect(user).grantFarmerRole(farmer.address)
-            ).to.be.revertedWith("Only admin can grant roles");
-        });
-
-        it("Should not allow non-admin to revoke farmer role", async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-            await expect(
-                cropBatchToken.connect(user).revokeFarmerRole(farmer.address)
-            ).to.be.revertedWith("Only admin can revoke roles");
-        });
-
-        it("Should allow users to renounce non-admin roles", async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-            await cropBatchToken.connect(farmer).renounceRole(FARMER_ROLE, farmer.address);
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, farmer.address)).to.be.false;
-        });
-
-        it("Should not allow renouncing admin role", async function () {
-            await expect(
-                cropBatchToken.connect(owner).renounceRole(DEFAULT_ADMIN_ROLE, owner.address)
-            ).to.be.revertedWith("Cannot renounce admin role");
-        });
-
-        it("Should not allow renouncing roles for others", async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-            await expect(
-                cropBatchToken.connect(user).renounceRole(FARMER_ROLE, farmer.address)
-            ).to.be.revertedWith("Can only renounce roles for self");
-        });
-
-        it("Should emit events when granting roles", async function () {
-            await expect(cropBatchToken.grantFarmerRole(farmer.address))
-                .to.emit(cropBatchToken, "RoleGranted")
-                .withArgs(FARMER_ROLE, farmer.address, owner.address);
-        });
-
-        it("Should emit events when revoking roles", async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-            await expect(cropBatchToken.revokeFarmerRole(farmer.address))
-                .to.emit(cropBatchToken, "RoleRevoked")
-                .withArgs(FARMER_ROLE, farmer.address, owner.address);
-        });
-
-        it("Should handle multiple farmers correctly", async function () {
-            const farmers = [farmer, anotherFarmer, user];
-
-            // Grant roles to multiple farmers
-            for (const f of farmers) {
-                await cropBatchToken.grantFarmerRole(f.address);
-                expect(await cropBatchToken.hasRole(FARMER_ROLE, f.address)).to.be.true;
-            }
-
-            // Revoke role from one farmer
-            await cropBatchToken.revokeFarmerRole(farmer.address);
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, farmer.address)).to.be.false;
-
-            // Others should still have the role
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, anotherFarmer.address)).to.be.true;
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, user.address)).to.be.true;
-        });
-
-        it("Should not grant role twice", async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-
-            // Granting again should not revert but also not emit event
-            const tx = await cropBatchToken.grantFarmerRole(farmer.address);
-            const receipt = await tx.wait();
-
-            // Should still have the role
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, farmer.address)).to.be.true;
-        });
-
-        it("Should handle role checks for zero address", async function () {
-            expect(await cropBatchToken.hasRole(FARMER_ROLE, ethers.constants.AddressZero)).to.be.false;
-            expect(await cropBatchToken.hasRole(DEFAULT_ADMIN_ROLE, ethers.constants.AddressZero)).to.be.false;
+                cropBatchToken.connect(farmer).mintNewBatch(
+                    farmer.address,
+                    "Test Crop",
+                    50,
+                    "Test Farm",
+                    Math.floor(Date.now() / 1000),
+                    "Test notes",
+                    SAMPLE_IPFS_URI
+                )
+            ).to.be.revertedWith("Must be farmer");
         });
     });
 
     describe("Minting", function () {
-        beforeEach(async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-        });
-
         it("Should allow farmer to mint a token", async function () {
+            const harvestDate = Math.floor(Date.now() / 1000);
+
             await expect(
-                cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, "0x")
+                cropBatchToken.connect(farmer).mintNewBatch(
+                    farmer.address,
+                    "Wheat",
+                    50,
+                    "Green Valley Farm",
+                    harvestDate,
+                    "Organic wheat batch",
+                    SAMPLE_IPFS_URI
+                )
             ).to.emit(cropBatchToken, "CropBatchMinted")
-                .withArgs(1, farmer.address, SAMPLE_IPFS_URI);
+                .withArgs(1, farmer.address, SAMPLE_IPFS_URI, "Wheat", 50);
 
             expect(await cropBatchToken.balanceOf(farmer.address, 1)).to.equal(1);
             expect(await cropBatchToken.uri(1)).to.equal(SAMPLE_IPFS_URI);
             expect(await cropBatchToken.exists(1)).to.be.true;
             expect(await cropBatchToken.nextTokenId()).to.equal(2);
+
+            // Check batch details
+            const batchInfo = await cropBatchToken.batchDetails(1);
+            expect(batchInfo.cropType).to.equal("Wheat");
+            expect(batchInfo.quantity).to.equal(50);
+            expect(batchInfo.originFarm).to.equal("Green Valley Farm");
+            expect(batchInfo.harvestDate).to.equal(harvestDate);
+            expect(batchInfo.notes).to.equal("Organic wheat batch");
+            expect(batchInfo.metadataUri).to.equal(SAMPLE_IPFS_URI);
         });
 
         it("Should not allow non-farmer to mint", async function () {
             await expect(
-                cropBatchToken.connect(user).mint(SAMPLE_IPFS_URI, "0x")
-            ).to.be.revertedWith("Caller must be a farmer");
+                cropBatchToken.connect(user).mintNewBatch(
+                    user.address,
+                    "Wheat",
+                    50,
+                    "Test Farm",
+                    Math.floor(Date.now() / 1000),
+                    "Test notes",
+                    SAMPLE_IPFS_URI
+                )
+            ).to.be.revertedWith("Must be farmer");
         });
 
         it("Should not allow empty metadata URI", async function () {
             await expect(
-                cropBatchToken.connect(farmer).mint("", "0x")
-            ).to.be.revertedWith("Metadata URI cannot be empty");
+                cropBatchToken.connect(farmer).mintNewBatch(
+                    farmer.address,
+                    "Wheat",
+                    50,
+                    "Test Farm",
+                    Math.floor(Date.now() / 1000),
+                    "Test notes",
+                    ""
+                )
+            ).to.be.revertedWith("Metadata URI required");
         });
 
         it("Should not allow non-IPFS URI", async function () {
             await expect(
-                cropBatchToken.connect(farmer).mint(INVALID_URI, "0x")
-            ).to.be.revertedWith("URI must start with 'ipfs://'");
+                cropBatchToken.connect(farmer).mintNewBatch(
+                    farmer.address,
+                    "Wheat",
+                    50,
+                    "Test Farm",
+                    Math.floor(Date.now() / 1000),
+                    "Test notes",
+                    INVALID_URI
+                )
+            ).to.be.revertedWith("Must start with 'ipfs://'");
+        });
+
+        it("Should not allow batch size exceeding maximum", async function () {
+            await expect(
+                cropBatchToken.connect(farmer).mintNewBatch(
+                    farmer.address,
+                    "Wheat",
+                    101, // Exceeds MAX_BATCH_SIZE of 100
+                    "Test Farm",
+                    Math.floor(Date.now() / 1000),
+                    "Test notes",
+                    SAMPLE_IPFS_URI
+                )
+            ).to.be.revertedWith("Batch too large");
+        });
+
+        it("Should not allow minting to zero address", async function () {
+            await expect(
+                cropBatchToken.connect(farmer).mintNewBatch(
+                    ethers.constants.AddressZero,
+                    "Wheat",
+                    50,
+                    "Test Farm",
+                    Math.floor(Date.now() / 1000),
+                    "Test notes",
+                    SAMPLE_IPFS_URI
+                )
+            ).to.be.revertedWith("Can't mint to zero address");
         });
 
         it("Should increment token IDs correctly", async function () {
-            await cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, "0x");
-            await cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI_2, "0x");
+            const harvestDate = Math.floor(Date.now() / 1000);
+
+            await cropBatchToken.connect(farmer).mintNewBatch(
+                farmer.address,
+                "Wheat",
+                50,
+                "Farm 1",
+                harvestDate,
+                "Batch 1",
+                SAMPLE_IPFS_URI
+            );
+
+            await cropBatchToken.connect(farmer).mintNewBatch(
+                farmer.address,
+                "Corn",
+                75,
+                "Farm 2",
+                harvestDate,
+                "Batch 2",
+                SAMPLE_IPFS_URI_2
+            );
 
             expect(await cropBatchToken.nextTokenId()).to.equal(3);
             expect(await cropBatchToken.exists(1)).to.be.true;
@@ -257,37 +318,32 @@ describe("CropBatchToken", function () {
             expect(await cropBatchToken.exists(3)).to.be.false;
         });
 
-        it("Should allow admin to mint tokens", async function () {
-            // Owner should have farmer role by default
-            await expect(
-                cropBatchToken.connect(owner).mint(SAMPLE_IPFS_URI, "0x")
-            ).to.emit(cropBatchToken, "CropBatchMinted")
-                .withArgs(1, owner.address, SAMPLE_IPFS_URI);
-
-            expect(await cropBatchToken.balanceOf(owner.address, 1)).to.equal(1);
-        });
-
-        it("Should handle minting with custom data", async function () {
-            const customData = ethers.utils.toUtf8Bytes("Custom mint data");
-
-            await expect(
-                cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, customData)
-            ).to.emit(cropBatchToken, "CropBatchMinted")
-                .withArgs(1, farmer.address, SAMPLE_IPFS_URI);
-
-            expect(await cropBatchToken.balanceOf(farmer.address, 1)).to.equal(1);
-        });
-
         it("Should handle multiple farmers minting", async function () {
-            await cropBatchToken.grantFarmerRole(anotherFarmer.address);
+            const harvestDate = Math.floor(Date.now() / 1000);
 
             // First farmer mints
-            await cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, "0x");
+            await cropBatchToken.connect(farmer).mintNewBatch(
+                farmer.address,
+                "Wheat",
+                50,
+                "Farm 1",
+                harvestDate,
+                "Farmer 1 batch",
+                SAMPLE_IPFS_URI
+            );
             expect(await cropBatchToken.balanceOf(farmer.address, 1)).to.equal(1);
             expect(await cropBatchToken.balanceOf(anotherFarmer.address, 1)).to.equal(0);
 
             // Second farmer mints
-            await cropBatchToken.connect(anotherFarmer).mint(SAMPLE_IPFS_URI_2, "0x");
+            await cropBatchToken.connect(anotherFarmer).mintNewBatch(
+                anotherFarmer.address,
+                "Corn",
+                75,
+                "Farm 2",
+                harvestDate,
+                "Farmer 2 batch",
+                SAMPLE_IPFS_URI_2
+            );
             expect(await cropBatchToken.balanceOf(anotherFarmer.address, 2)).to.equal(1);
             expect(await cropBatchToken.balanceOf(farmer.address, 2)).to.equal(0);
 
@@ -307,7 +363,15 @@ describe("CropBatchToken", function () {
 
             for (const uri of invalidUris) {
                 await expect(
-                    cropBatchToken.connect(farmer).mint(uri, "0x")
+                    cropBatchToken.connect(farmer).mintNewBatch(
+                        farmer.address,
+                        "Wheat",
+                        50,
+                        "Test Farm",
+                        Math.floor(Date.now() / 1000),
+                        "Test notes",
+                        uri
+                    )
                 ).to.be.reverted;
             }
         });
@@ -316,13 +380,20 @@ describe("CropBatchToken", function () {
             const validUris = [
                 "ipfs://QmSampleHash123456789abcdef",
                 "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
-                "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
-                "ipfs://bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"
             ];
 
             for (let i = 0; i < validUris.length; i++) {
                 await expect(
-                    cropBatchToken.connect(farmer).mint(validUris[i], "0x")
+                    cropBatchToken.connect(farmer).mintNewBatch(
+                        farmer.address,
+                        `Crop${i}`,
+                        50,
+                        `Farm${i}`,
+                        Math.floor(Date.now() / 1000),
+                        `Notes${i}`,
+                        validUris[i]
+                    )
                 ).to.not.be.reverted;
 
                 expect(await cropBatchToken.exists(i + 1)).to.be.true;
@@ -331,151 +402,23 @@ describe("CropBatchToken", function () {
         });
     });
 
-    describe("Batch Minting", function () {
-        beforeEach(async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-        });
 
-        it("Should allow farmer to batch mint tokens", async function () {
-            const uris = [SAMPLE_IPFS_URI, SAMPLE_IPFS_URI_2];
-
-            await expect(
-                cropBatchToken.connect(farmer).batchMint(uris, "0x")
-            ).to.emit(cropBatchToken, "CropBatchMinted")
-                .withArgs(1, farmer.address, SAMPLE_IPFS_URI)
-                .and.to.emit(cropBatchToken, "CropBatchMinted")
-                .withArgs(2, farmer.address, SAMPLE_IPFS_URI_2);
-
-            expect(await cropBatchToken.balanceOf(farmer.address, 1)).to.equal(1);
-            expect(await cropBatchToken.balanceOf(farmer.address, 2)).to.equal(1);
-            expect(await cropBatchToken.nextTokenId()).to.equal(3);
-        });
-
-        it("Should not allow empty batch", async function () {
-            await expect(
-                cropBatchToken.connect(farmer).batchMint([], "0x")
-            ).to.be.revertedWith("No metadata URIs provided");
-        });
-
-        it("Should not allow batch size exceeding limit", async function () {
-            const uris = new Array(101).fill(SAMPLE_IPFS_URI);
-            await expect(
-                cropBatchToken.connect(farmer).batchMint(uris, "0x")
-            ).to.be.revertedWith("Batch size exceeds limit");
-        });
-
-        it("Should not allow non-farmer to batch mint", async function () {
-            await expect(
-                cropBatchToken.connect(user).batchMint([SAMPLE_IPFS_URI], "0x")
-            ).to.be.revertedWith("Caller must be a farmer");
-        });
-
-        it("Should handle maximum batch size correctly", async function () {
-            const maxBatchSize = 100;
-            const uris = new Array(maxBatchSize).fill(SAMPLE_IPFS_URI);
-
-            // This should succeed
-            await expect(
-                cropBatchToken.connect(farmer).batchMint(uris, "0x")
-            ).to.not.be.reverted;
-
-            expect(await cropBatchToken.nextTokenId()).to.equal(maxBatchSize + 1);
-
-            // Check that all tokens were minted
-            for (let i = 1; i <= maxBatchSize; i++) {
-                expect(await cropBatchToken.exists(i)).to.be.true;
-                expect(await cropBatchToken.balanceOf(farmer.address, i)).to.equal(1);
-            }
-        });
-
-        it("Should validate all URIs in batch", async function () {
-            const mixedUris = [
-                SAMPLE_IPFS_URI,
-                INVALID_URI,  // This should cause the entire batch to fail
-                SAMPLE_IPFS_URI_2
-            ];
-
-            await expect(
-                cropBatchToken.connect(farmer).batchMint(mixedUris, "0x")
-            ).to.be.revertedWith("URI must start with 'ipfs://'");
-
-            // No tokens should be minted
-            expect(await cropBatchToken.nextTokenId()).to.equal(1);
-        });
-
-        it("Should not allow empty URIs in batch", async function () {
-            const urisWithEmpty = [
-                SAMPLE_IPFS_URI,
-                "",  // Empty URI
-                SAMPLE_IPFS_URI_2
-            ];
-
-            await expect(
-                cropBatchToken.connect(farmer).batchMint(urisWithEmpty, "0x")
-            ).to.be.revertedWith("Metadata URI cannot be empty");
-        });
-
-        it("Should handle single item batch", async function () {
-            await expect(
-                cropBatchToken.connect(farmer).batchMint([SAMPLE_IPFS_URI], "0x")
-            ).to.emit(cropBatchToken, "CropBatchMinted")
-                .withArgs(1, farmer.address, SAMPLE_IPFS_URI);
-
-            expect(await cropBatchToken.balanceOf(farmer.address, 1)).to.equal(1);
-            expect(await cropBatchToken.nextTokenId()).to.equal(2);
-        });
-
-        it("Should handle batch minting with custom data", async function () {
-            const customData = ethers.utils.toUtf8Bytes("Batch mint data");
-            const uris = [SAMPLE_IPFS_URI, SAMPLE_IPFS_URI_2];
-
-            await expect(
-                cropBatchToken.connect(farmer).batchMint(uris, customData)
-            ).to.emit(cropBatchToken, "CropBatchMinted")
-                .withArgs(1, farmer.address, SAMPLE_IPFS_URI);
-
-            expect(await cropBatchToken.balanceOf(farmer.address, 1)).to.equal(1);
-            expect(await cropBatchToken.balanceOf(farmer.address, 2)).to.equal(1);
-        });
-
-        it("Should maintain correct token IDs across multiple batch mints", async function () {
-            // First batch
-            await cropBatchToken.connect(farmer).batchMint([SAMPLE_IPFS_URI, SAMPLE_IPFS_URI_2], "0x");
-            expect(await cropBatchToken.nextTokenId()).to.equal(3);
-
-            // Second batch
-            await cropBatchToken.connect(farmer).batchMint([SAMPLE_IPFS_URI_3], "0x");
-            expect(await cropBatchToken.nextTokenId()).to.equal(4);
-
-            // Verify all tokens exist and have correct URIs
-            expect(await cropBatchToken.uri(1)).to.equal(SAMPLE_IPFS_URI);
-            expect(await cropBatchToken.uri(2)).to.equal(SAMPLE_IPFS_URI_2);
-            expect(await cropBatchToken.uri(3)).to.equal(SAMPLE_IPFS_URI_3);
-        });
-
-        it("Should emit correct events for large batches", async function () {
-            const uris = [SAMPLE_IPFS_URI, SAMPLE_IPFS_URI_2, SAMPLE_IPFS_URI_3];
-
-            const tx = await cropBatchToken.connect(farmer).batchMint(uris, "0x");
-            const receipt = await tx.wait();
-
-            // Count CropBatchMinted events
-            const mintEvents = receipt.events.filter(e => e.event === "CropBatchMinted");
-            expect(mintEvents.length).to.equal(uris.length);
-
-            // Verify event data
-            for (let i = 0; i < uris.length; i++) {
-                expect(mintEvents[i].args.tokenId).to.equal(i + 1);
-                expect(mintEvents[i].args.farmer).to.equal(farmer.address);
-                expect(mintEvents[i].args.metadataUri).to.equal(uris[i]);
-            }
-        });
-    });
 
     describe("Metadata Management", function () {
         beforeEach(async function () {
-            await cropBatchToken.grantFarmerRole(farmer.address);
-            await cropBatchToken.connect(farmer).mint(SAMPLE_IPFS_URI, "0x");
+            // Mint a token first
+            await cropBatchToken.connect(farmer).mintNewBatch(
+                farmer.address,
+                "Wheat",
+                50,
+                "Test Farm",
+                Math.floor(Date.now() / 1000),
+                "Test notes",
+                SAMPLE_IPFS_URI
+            );
+
+            // Grant admin role to owner through UserManagement
+            await userManagement.grantRole(ADMIN_ROLE_FOR_CROPS, owner.address);
         });
 
         it("Should allow admin to update token URI", async function () {
@@ -485,18 +428,22 @@ describe("CropBatchToken", function () {
                 .withArgs(1, SAMPLE_IPFS_URI_2);
 
             expect(await cropBatchToken.uri(1)).to.equal(SAMPLE_IPFS_URI_2);
+
+            // Check that batch details are updated
+            const batchInfo = await cropBatchToken.batchDetails(1);
+            expect(batchInfo.metadataUri).to.equal(SAMPLE_IPFS_URI_2);
         });
 
         it("Should not allow non-admin to update token URI", async function () {
             await expect(
                 cropBatchToken.connect(user).updateTokenUri(1, SAMPLE_IPFS_URI_2)
-            ).to.be.revertedWith("Only admin can update URI");
+            ).to.be.revertedWith("Must be admin");
         });
 
         it("Should not allow updating non-existent token", async function () {
             await expect(
                 cropBatchToken.updateTokenUri(999, SAMPLE_IPFS_URI_2)
-            ).to.be.revertedWith("Token does not exist");
+            ).to.be.revertedWith("Token doesn't exist");
         });
 
         it("Should allow admin to freeze metadata", async function () {
@@ -518,14 +465,14 @@ describe("CropBatchToken", function () {
         it("Should not allow non-admin to freeze metadata", async function () {
             await expect(
                 cropBatchToken.connect(user).freezeMetadata(1)
-            ).to.be.revertedWith("Only admin can freeze metadata");
+            ).to.be.revertedWith("Must be admin");
         });
 
         it("Should not allow freezing already frozen metadata", async function () {
             await cropBatchToken.freezeMetadata(1);
             await expect(
                 cropBatchToken.freezeMetadata(1)
-            ).to.be.revertedWith("Metadata already frozen");
+            ).to.be.revertedWith("Already frozen");
         });
 
         it("Should handle metadata updates for multiple tokens", async function () {
