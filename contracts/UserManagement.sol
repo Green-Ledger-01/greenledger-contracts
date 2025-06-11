@@ -48,5 +48,15 @@ contract UserManagement is AccessControl {
         revert("UserManagement: Invalid role"); 
     }
 
-   
+    /**
+     * @dev Registers a user by granting them a specific role.
+     * @param _user The address of the user to register.
+     * @param _role The role to assign to the user (Farmer, Transporter, Buyer).
+     */
+    function registerUser(address _user, UserRole _role) public virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 roleBytes = _getRoleBytes(_role);
+        _grantRole(roleBytes, _user);
+    }
+
+    
 }
