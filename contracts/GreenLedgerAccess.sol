@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title GreenLedgerAccess
@@ -17,12 +17,12 @@ contract GreenLedgerAccess is AccessControl, Pausable {
     bytes32 public constant CONSUMER_ROLE = keccak256("CONSUMER_ROLE");
     
     // Events
-    event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
-    event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
+    // event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
+    // event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
     event PauseToggled(bool isPaused);
     
     /**
-     * @dev Constructor that sets up the admin role
+     * @dev Sets up the admin role for the deployer
      */
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -32,7 +32,7 @@ contract GreenLedgerAccess is AccessControl, Pausable {
     /**
      * @dev Grants a role to an account
      * @param role The role to grant
-     * @param account The account to grant the role to
+     * @param account The account to receive the role
      */
     function grantRole(bytes32 role, address account) 
         public 
@@ -77,12 +77,12 @@ contract GreenLedgerAccess is AccessControl, Pausable {
      * @dev Checks if an account has a specific role
      * @param role The role to check
      * @param account The account to check
-     * @return bool True if the account has the role
+     * @return True if the account has the role
      */
     function hasRole(bytes32 role, address account) 
         public 
         view 
-        override(AccessControl) 
+        override 
         returns (bool) 
     {
         return super.hasRole(role, account);
@@ -90,10 +90,9 @@ contract GreenLedgerAccess is AccessControl, Pausable {
     
     /**
      * @dev Checks if the contract is paused
-     * @return bool True if the contract is paused
+     * @return True if paused
      */
     function isPaused() external view returns (bool) {
         return paused();
     }
 }
-

@@ -6,104 +6,107 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title UserManagement
- * @dev Manages user roles (Farmer, Transporter, Buyer) for GreenLedger.
- * Built with AccessControl for role management and Pausable for emergencies.
+ * @dev Manages user roles and permissions for the GreenLedger platform
  */
 contract UserManagement is AccessControl, Pausable {
-    // Roles for supply chain folks.
+    // Role definitions
     bytes32 public constant FARMER_ROLE = keccak256("FARMER_ROLE");
     bytes32 public constant TRANSPORTER_ROLE = keccak256("TRANSPORTER_ROLE");
     bytes32 public constant BUYER_ROLE = keccak256("BUYER_ROLE");
-
-    // Enum to make roles easier to work with.
+    
+    // User role enum for easier registration
     enum UserRole {
-        Farmer,
-        Transporter,
-        Buyer
+        Farmer,      // 0
+        Transporter, // 1
+        Buyer        // 2
     }
-
-    // Events to track role changes.
+    
+    // Events
     event UserRegistered(address indexed user, bytes32 indexed role);
     event UserRoleRevoked(address indexed user, bytes32 indexed role);
-
+    
     /**
-     * @dev Sets up the contract with an admin who can manage roles.
+     * @dev Sets up the admin role for the deployer
+     * @param initialAdmin The address that will be granted the admin role
      */
     constructor(address initialAdmin) {
+        require(initialAdmin != address(0), "Invalid admin address");
         _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
     }
-
+    
     /**
-     * @dev Converts UserRole enum to bytes32 role hash.
+     * @dev Register a user with a specific role
+     * @param _user The address of the user to register
+     * @param _role The role to assign (0=Farmer, 1=Transporter, 2=Buyer)
      */
-    function _getRoleBytes(UserRole _role) internal pure returns (bytes32) {
-        if (_role == UserRole.Farmer) return FARMER_ROLE;
-        if (_role == UserRole.Transporter) return TRANSPORTER_ROLE;
-        if (_role == UserRole.Buyer) return BUYER_ROLE;
-        revert("Invalid role");
-    }
-
-    /**
-     * @dev Assigns a role to a user. Only admins can call this.
-     */
-    function registerUser(address _user, UserRole _role) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerUser(address _user, UserRole _role) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_user != address(0), "Can't register zero address");
-        bytes32 roleBytes = _getRoleBytes(_role);
-        _grantRole(roleBytes, _user);
-        emit UserRegistered(_user, roleBytes);
+        
+        bytes32 role = _getRoleFromEnum(_role);
+        _grantRole(role, _user);
+        
+        emit UserRegistered(_user, role);
     }
-
+    
     /**
-     * @dev Revokes a role from a user. Only admins can call this.
+     * @dev Revoke a user's role
+     * @param _user The address of the user
+     * @param _role The role to revoke (0=Farmer, 1=Transporter, 2=Buyer)
      */
-    function revokeRole(address _user, UserRole _role) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function revokeRole(address _user, UserRole _role) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_user != address(0), "Can't revoke from zero address");
-        bytes32 roleBytes = _getRoleBytes(_role);
-        _revokeRole(roleBytes, _user);
-        emit UserRoleRevoked(_user, roleBytes);
+        
+        bytes32 role = _getRoleFromEnum(_role);
+        _revokeRole(role, _user);
+        
+        emit UserRoleRevoked(_user, role);
     }
-
+    
     /**
-     * @dev Checks a user's roles in one go.
+     * @dev Get the role status for a user
+     * @param _user The address to check
+     * @return isFarmer True if user has farmer role
+     * @return isTransporter True if user has transporter role
+     * @return isBuyer True if user has buyer role
      */
-    function getUserRolesStatus(address _user)
-        public
-        view
-        returns (
-            bool isFarmer,
-            bool isTransporter,
-            bool isBuyer
-        )
-    {
+    function getUserRolesStatus(address _user) external view returns (
+        bool isFarmer,
+        bool isTransporter,
+        bool isBuyer
+    ) {
         isFarmer = hasRole(FARMER_ROLE, _user);
         isTransporter = hasRole(TRANSPORTER_ROLE, _user);
         isBuyer = hasRole(BUYER_ROLE, _user);
     }
-
+    
     /**
-     * @dev Pauses the contract in emergencies. Admin-only.
+     * @dev Pause the contract (admin only)
      */
-    function pause() public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
-
+    
     /**
-     * @dev Unpauses the contract. Admin-only.
+     * @dev Unpause the contract (admin only)
      */
-    function unpause() public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
-
+    
     /**
-     * @dev Confirms support for AccessControl interfaces.
+     * @dev Internal function to convert enum to role hash
+     * @param _role The UserRole enum value
+     * @return The corresponding bytes32 role hash
      */
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(AccessControl)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
+    function _getRoleFromEnum(UserRole _role) internal pure returns (bytes32) {
+        if (_role == UserRole.Farmer) {
+            return FARMER_ROLE;
+        } else if (_role == UserRole.Transporter) {
+            return TRANSPORTER_ROLE;
+        } else if (_role == UserRole.Buyer) {
+            return BUYER_ROLE;
+        } else {
+            revert("Invalid role");
+        }
     }
 }

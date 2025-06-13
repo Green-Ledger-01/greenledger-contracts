@@ -6,8 +6,8 @@ Blockchain-based platform for tokenizing and tracking crop batches as NFTs on Li
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| UserManagement | `0xACb3006347dAEa28a511733840999d040aABf9aA` | [View](https://sepolia-blockscout.lisk.com/address/0xACb3006347dAEa28a511733840999d040aABf9aA) |
-| CropBatchToken | `0x801055F1dD9C0CFC91B2834eEE2b28662803beB5` | [View](https://sepolia-blockscout.lisk.com/address/0x801055F1dD9C0CFC91B2834eEE2b28662803beB5) |
+| UserManagement | `0x58C584ddDaAe2DF9Ac73F33F733B876Ffc23CE53` | [View](https://sepolia-blockscout.lisk.com/address/0x58C584ddDaAe2DF9Ac73F33F733B876Ffc23CE53) |
+| CropBatchToken | `0x4097236ED51C12a7b57Af129190E0166248709D0` | [View](https://sepolia-blockscout.lisk.com/address/0x4097236ED51C12a7b57Af129190E0166248709D0) |
 
 **Network**: Lisk Sepolia Testnet (Chain ID: 4202)
 
@@ -56,8 +56,8 @@ npm test
 npx hardhat console --network lisk
 
 // Get contract instances
-const userManagement = await ethers.getContractAt('UserManagement', '0xACb3006347dAEa28a511733840999d040aABf9aA');
-const cropBatchToken = await ethers.getContractAt('CropBatchToken', '0x801055F1dD9C0CFC91B2834eEE2b28662803beB5');
+const userManagement = await ethers.getContractAt('UserManagement', '0x58C584ddDaAe2DF9Ac73F33F733B876Ffc23CE53');
+const cropBatchToken = await ethers.getContractAt('CropBatchToken', '0x4097236ED51C12a7b57Af129190E0166248709D0');
 ```
 
 ### Register Users & Mint Tokens

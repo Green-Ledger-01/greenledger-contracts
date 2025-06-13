@@ -4,16 +4,16 @@
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| UserManagement | `0xACb3006347dAEa28a511733840999d040aABf9aA` | [View](https://sepolia-blockscout.lisk.com/address/0xACb3006347dAEa28a511733840999d040aABf9aA) |
-| CropBatchToken | `0x801055F1dD9C0CFC91B2834eEE2b28662803beB5` | [View](https://sepolia-blockscout.lisk.com/address/0x801055F1dD9C0CFC91B2834eEE2b28662803beB5) |
+| UserManagement | `0x58C584ddDaAe2DF9Ac73F33F733B876Ffc23CE53` | [View](https://sepolia-blockscout.lisk.com/address/0x58C584ddDaAe2DF9Ac73F33F733B876Ffc23CE53) |
+| CropBatchToken | `0x4097236ED51C12a7b57Af129190E0166248709D0` | [View](https://sepolia-blockscout.lisk.com/address/0x4097236ED51C12a7b57Af129190E0166248709D0) |
 
-**Deployed**: December 19, 2024 | **Deployer**: `0xF65781317f8E35891CD2edDa1Db26e56ba53B736`
+**Deployed**: December 19, 2024 | **Deployer**: `0xE9aEfF2e55e0B537a89995465cf49EAA4737cfb7`
 
 ## ⚙️ Configuration
 
-**Royalty**: 2.5% to `0xF65781317f8E35891CD2edDa1Db26e56ba53B736`
+**Royalty**: 2.5% to `0xE9aEfF2e55e0B537a89995465cf49EAA4737cfb7`
 **Max Batch Size**: 100 kg
-**Admin**: `0xF65781317f8E35891CD2edDa1Db26e56ba53B736`
+**Admin**: `0xE9aEfF2e55e0B537a89995465cf49EAA4737cfb7`
 
 ## 🚀 Deploy
 
@@ -31,8 +31,8 @@ npx hardhat console --network lisk
 
 ```javascript
 // Connect to contracts
-const userManagement = await ethers.getContractAt('UserManagement', '0xACb3006347dAEa28a511733840999d040aABf9aA');
-const cropBatchToken = await ethers.getContractAt('CropBatchToken', '0x801055F1dD9C0CFC91B2834eEE2b28662803beB5');
+const userManagement = await ethers.getContractAt('UserManagement', '0x58C584ddDaAe2DF9Ac73F33F733B876Ffc23CE53');
+const cropBatchToken = await ethers.getContractAt('CropBatchToken', '0x4097236ED51C12a7b57Af129190E0166248709D0');
 
 // Register farmer and mint token
 await userManagement.registerUser('0xFarmerAddress', 0);
